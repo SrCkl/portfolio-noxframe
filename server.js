@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const path = require('path');
 const express = require('express');
 const multer = require('multer');
-const cloudinary = require('cloudinary').v2;
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,14 +12,8 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 
 const ADMIN_COOKIE = 'noxframe_auth';
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 8;
-const CLOUDINARY_FOLDER = process.env.CLOUDINARY_FOLDER || 'noxframe-portfolio';
-const DATA_PUBLIC_ID = `${CLOUDINARY_FOLDER}/projects-data.json`;
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'portfolio';
+const PROJECTS_TABLE = 'projects';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -38,20 +32,27 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(PUBLIC_DIR, { etag: true, maxAge: '1h' }));
 
-function hasCloudinaryConfig() {
-  return Boolean(
-    process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET
-  );
+function hasSupabaseConfig() {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
-function requireCloudinaryConfig() {
-  if (!hasCloudinaryConfig()) {
-    const err = new Error('Configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET.');
+function requireSupabaseConfig() {
+  if (!hasSupabaseConfig()) {
+    const err = new Error('Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY nas variáveis de ambiente.');
     err.status = 500;
     throw err;
   }
+}
+
+function getSupabase() {
+  requireSupabaseConfig();
+
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
 }
 
 function cleanText(value, max = 80) {
@@ -67,15 +68,15 @@ function slugify(value) {
     .replace(/^-+|-+$/g, '') || 'outros';
 }
 
+function labelFromSlug(value) {
+  return String(value || 'Outros')
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function safeSize(value) {
   const allowed = new Set(['square', 'wide', 'tall']);
   return allowed.has(value) ? value : 'square';
-}
-
-function normalizeOrder(items) {
-  return [...items]
-    .sort((a, b) => Number(a.order || 9999) - Number(b.order || 9999))
-    .map((item, index) => ({ ...item, order: index + 1 }));
 }
 
 function publicProject(item) {
@@ -94,72 +95,101 @@ function publicProject(item) {
   };
 }
 
-function dataUrl() {
-  const cloud = process.env.CLOUDINARY_CLOUD_NAME;
-  const encodedPublicId = DATA_PUBLIC_ID.split('/').map(encodeURIComponent).join('/');
-  return `https://res.cloudinary.com/${cloud}/raw/upload/${encodedPublicId}`;
+function rowToProject(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    category: row.category,
+    categoryLabel: row.category_label || labelFromSlug(row.category),
+    type: row.type,
+    typeLabel: row.type_label || labelFromSlug(row.type),
+    image: row.image_url,
+    size: row.format || 'square',
+    order: Number(row.sort_order || 0),
+    storagePath: row.storage_path || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
 }
 
 async function readProjects() {
-  if (!hasCloudinaryConfig()) return [];
+  if (!hasSupabaseConfig()) return [];
 
-  const response = await fetch(`${dataUrl()}?t=${Date.now()}`, { cache: 'no-store' });
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from(PROJECTS_TABLE)
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
 
-  if (response.status === 404) return [];
+  if (error) throw new Error('Não foi possível carregar as artes no Supabase: ' + error.message);
 
-  if (!response.ok) {
-    throw new Error('Não foi possível carregar os dados do portfólio no Cloudinary.');
-  }
-
-  const items = await response.json();
-  return Array.isArray(items) ? normalizeOrder(items) : [];
+  return (data || []).map(rowToProject);
 }
 
-function uploadBuffer(buffer, options) {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
-      if (error) return reject(error);
-      resolve(result);
+async function getProjectRow(id) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from(PROJECTS_TABLE)
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) return null;
+  return data;
+}
+
+async function getNextOrder() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from(PROJECTS_TABLE)
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  if (error) throw new Error('Não foi possível calcular a ordem da arte: ' + error.message);
+  return Number(data?.[0]?.sort_order || 0) + 1;
+}
+
+async function uploadImageToSupabase(file, category = 'outros') {
+  const supabase = getSupabase();
+  const extByMime = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif'
+  };
+
+  const ext = extByMime[file.mimetype] || path.extname(file.originalname || '').replace('.', '') || 'jpg';
+  const fileName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${ext}`;
+  const storagePath = `${slugify(category)}/${fileName}`;
+
+  const { error } = await supabase.storage
+    .from(SUPABASE_BUCKET)
+    .upload(storagePath, file.buffer, {
+      contentType: file.mimetype,
+      cacheControl: '31536000',
+      upsert: false
     });
 
-    stream.end(buffer);
-  });
+  if (error) throw new Error('Erro ao enviar imagem para o Supabase Storage: ' + error.message);
+
+  const { data } = supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(storagePath);
+
+  return {
+    imageUrl: data.publicUrl,
+    storagePath
+  };
 }
 
-async function saveProjects(items) {
-  requireCloudinaryConfig();
-  const normalized = normalizeOrder(items);
-  const buffer = Buffer.from(JSON.stringify(normalized, null, 2), 'utf8');
-
-  await uploadBuffer(buffer, {
-    resource_type: 'raw',
-    public_id: DATA_PUBLIC_ID,
-    overwrite: true,
-    invalidate: true
-  });
-
-  return normalized;
-}
-
-async function uploadImageToCloudinary(file) {
-  requireCloudinaryConfig();
-
-  return uploadBuffer(file.buffer, {
-    resource_type: 'image',
-    folder: CLOUDINARY_FOLDER,
-    use_filename: false,
-    unique_filename: true,
-    overwrite: false
-  });
-}
-
-async function removeCloudinaryImage(publicId) {
-  if (!publicId || !hasCloudinaryConfig()) return;
+async function removeSupabaseImage(storagePath) {
+  if (!storagePath || !hasSupabaseConfig()) return;
 
   try {
-    await cloudinary.uploader.destroy(publicId, { resource_type: 'image', invalidate: true });
+    const supabase = getSupabase();
+    await supabase.storage.from(SUPABASE_BUCKET).remove([storagePath]);
   } catch (error) {
-    console.warn('Não foi possível remover imagem do Cloudinary:', error.message);
+    console.warn('Não foi possível remover imagem do Supabase:', error.message);
   }
 }
 
@@ -188,13 +218,20 @@ function createAdminToken() {
   return `${payload}.${sign(payload)}`;
 }
 
+function safeCompare(a, b) {
+  const aBuffer = Buffer.from(String(a || ''));
+  const bBuffer = Buffer.from(String(b || ''));
+  if (aBuffer.length !== bBuffer.length) return false;
+  return crypto.timingSafeEqual(aBuffer, bBuffer);
+}
+
 function verifyAdminToken(token) {
   if (!token || !token.includes('.')) return false;
 
   const [payload, signature] = token.split('.');
   const expected = sign(payload);
 
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return false;
+  if (!safeCompare(signature, expected)) return false;
 
   try {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
@@ -223,7 +260,7 @@ function requireAdmin(req, res, next) {
   return res.status(401).json({ ok: false, message: 'Faça login para acessar o painel.' });
 }
 
-async function buildProjectFromBody(body, file, oldItem = null) {
+async function buildProjectFromBody(body, file, oldRow = null) {
   const title = cleanText(body.title, 100);
   const categoryLabel = cleanText(body.categoryLabel || body.category, 40) || 'Outros';
   const category = slugify(body.category || categoryLabel);
@@ -236,36 +273,30 @@ async function buildProjectFromBody(body, file, oldItem = null) {
     throw err;
   }
 
-  if (!oldItem && !file) {
+  if (!oldRow && !file) {
     const err = new Error('Envie uma imagem para publicar.');
     err.status = 400;
     throw err;
   }
 
-  let image = oldItem?.image || '';
-  let cloudinaryPublicId = oldItem?.cloudinaryPublicId || '';
+  let imageUrl = oldRow?.image_url || '';
+  let storagePath = oldRow?.storage_path || '';
 
   if (file) {
-    const uploaded = await uploadImageToCloudinary(file);
-    image = uploaded.secure_url;
-    cloudinaryPublicId = uploaded.public_id;
+    const uploaded = await uploadImageToSupabase(file, category);
+    imageUrl = uploaded.imageUrl;
+    storagePath = uploaded.storagePath;
   }
 
-  const now = new Date().toISOString();
-
   return {
-    id: oldItem?.id || crypto.randomUUID(),
     title,
-    category,
-    categoryLabel,
     type,
-    typeLabel,
-    image,
-    cloudinaryPublicId,
-    size: safeSize(body.size),
-    order: oldItem?.order || 9999,
-    createdAt: oldItem?.createdAt || now,
-    updatedAt: now
+    type_label: typeLabel,
+    category,
+    category_label: categoryLabel,
+    format: safeSize(body.size),
+    image_url: imageUrl,
+    storage_path: storagePath
   };
 }
 
@@ -290,7 +321,7 @@ app.post('/api/admin/login', (req, res) => {
     return res.status(500).json({ ok: false, message: 'Configure ADMIN_PASSWORD nas variáveis de ambiente.' });
   }
 
-  if (password !== adminPassword) {
+  if (!safeCompare(password, adminPassword)) {
     return res.status(401).json({ ok: false, message: 'Senha incorreta.' });
   }
 
@@ -313,63 +344,80 @@ app.get('/api/admin/projects', requireAdmin, async (req, res, next) => {
 });
 
 app.post('/api/admin/projects', requireAdmin, upload.single('image'), async (req, res, next) => {
-  let item = null;
+  let uploadedStoragePath = '';
 
   try {
-    const items = await readProjects();
-    item = await buildProjectFromBody(req.body, req.file);
-    item.order = items.length + 1;
+    const supabase = getSupabase();
+    const row = await buildProjectFromBody(req.body, req.file);
+    uploadedStoragePath = row.storage_path;
+    row.sort_order = await getNextOrder();
 
-    const saved = await saveProjects([...items, item]);
-    res.json({ ok: true, item: saved.find((project) => project.id === item.id) });
+    const { data, error } = await supabase
+      .from(PROJECTS_TABLE)
+      .insert(row)
+      .select('*')
+      .single();
+
+    if (error) throw new Error('Erro ao salvar arte no banco: ' + error.message);
+
+    res.json({ ok: true, item: rowToProject(data) });
   } catch (error) {
-    if (item?.cloudinaryPublicId) await removeCloudinaryImage(item.cloudinaryPublicId);
+    if (uploadedStoragePath) await removeSupabaseImage(uploadedStoragePath);
     next(error);
   }
 });
 
 app.post('/api/admin/projects/:id', requireAdmin, upload.single('image'), async (req, res, next) => {
-  let uploadedNewImage = null;
+  let uploadedStoragePath = '';
 
   try {
-    const items = await readProjects();
-    const index = items.findIndex((item) => item.id === req.params.id);
+    const supabase = getSupabase();
+    const oldRow = await getProjectRow(req.params.id);
 
-    if (index === -1) {
+    if (!oldRow) {
       return res.status(404).json({ ok: false, message: 'Arte não encontrada.' });
     }
 
-    const oldItem = items[index];
-    const updated = await buildProjectFromBody(req.body, req.file, oldItem);
-    uploadedNewImage = req.file ? updated.cloudinaryPublicId : null;
+    const row = await buildProjectFromBody(req.body, req.file, oldRow);
+    uploadedStoragePath = req.file ? row.storage_path : '';
 
-    items[index] = updated;
-    const saved = await saveProjects(items);
+    const { data, error } = await supabase
+      .from(PROJECTS_TABLE)
+      .update(row)
+      .eq('id', req.params.id)
+      .select('*')
+      .single();
 
-    if (req.file && oldItem.cloudinaryPublicId && oldItem.cloudinaryPublicId !== updated.cloudinaryPublicId) {
-      await removeCloudinaryImage(oldItem.cloudinaryPublicId);
+    if (error) throw new Error('Erro ao atualizar arte: ' + error.message);
+
+    if (req.file && oldRow.storage_path && oldRow.storage_path !== row.storage_path) {
+      await removeSupabaseImage(oldRow.storage_path);
     }
 
-    res.json({ ok: true, item: saved.find((project) => project.id === updated.id) });
+    res.json({ ok: true, item: rowToProject(data) });
   } catch (error) {
-    if (uploadedNewImage) await removeCloudinaryImage(uploadedNewImage);
+    if (uploadedStoragePath) await removeSupabaseImage(uploadedStoragePath);
     next(error);
   }
 });
 
 app.post('/api/admin/projects/:id/delete', requireAdmin, async (req, res, next) => {
   try {
-    const items = await readProjects();
-    const item = items.find((project) => project.id === req.params.id);
+    const supabase = getSupabase();
+    const oldRow = await getProjectRow(req.params.id);
 
-    if (!item) {
+    if (!oldRow) {
       return res.status(404).json({ ok: false, message: 'Arte não encontrada.' });
     }
 
-    const remaining = items.filter((project) => project.id !== req.params.id);
-    await saveProjects(remaining);
-    await removeCloudinaryImage(item.cloudinaryPublicId);
+    const { error } = await supabase
+      .from(PROJECTS_TABLE)
+      .delete()
+      .eq('id', req.params.id);
 
+    if (error) throw new Error('Erro ao remover arte: ' + error.message);
+
+    await removeSupabaseImage(oldRow.storage_path);
     res.json({ ok: true });
   } catch (error) {
     next(error);
@@ -379,6 +427,7 @@ app.post('/api/admin/projects/:id/delete', requireAdmin, async (req, res, next) 
 app.post('/api/admin/projects/:id/move', requireAdmin, async (req, res, next) => {
   try {
     const direction = req.body.direction === 'down' ? 'down' : 'up';
+    const supabase = getSupabase();
     const items = await readProjects();
     const index = items.findIndex((item) => item.id === req.params.id);
 
@@ -392,11 +441,24 @@ app.post('/api/admin/projects/:id/move', requireAdmin, async (req, res, next) =>
       return res.json({ ok: true, items });
     }
 
-    const temp = items[index].order;
-    items[index].order = items[targetIndex].order;
-    items[targetIndex].order = temp;
+    const current = items[index];
+    const target = items[targetIndex];
 
-    const saved = await saveProjects(items);
+    const { error: errorOne } = await supabase
+      .from(PROJECTS_TABLE)
+      .update({ sort_order: target.order })
+      .eq('id', current.id);
+
+    if (errorOne) throw new Error('Erro ao mover arte: ' + errorOne.message);
+
+    const { error: errorTwo } = await supabase
+      .from(PROJECTS_TABLE)
+      .update({ sort_order: current.order })
+      .eq('id', target.id);
+
+    if (errorTwo) throw new Error('Erro ao mover arte: ' + errorTwo.message);
+
+    const saved = await readProjects();
     res.json({ ok: true, items: saved });
   } catch (error) {
     next(error);
