@@ -12,7 +12,7 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 
 const ADMIN_COOKIE = 'noxframe_auth';
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 8;
-const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'portfolio';
+const SUPABASE_BUCKET = String(process.env.SUPABASE_BUCKET || 'portfolio').trim();
 const PROJECTS_TABLE = 'projects';
 
 const upload = multer({
@@ -33,7 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(PUBLIC_DIR, { etag: true, maxAge: '1h' }));
 
 function hasSupabaseConfig() {
-  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(String(process.env.SUPABASE_URL || '').trim() && String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim());
 }
 
 function requireSupabaseConfig() {
@@ -47,7 +47,10 @@ function requireSupabaseConfig() {
 function getSupabase() {
   requireSupabaseConfig();
 
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+  const supabaseUrl = String(process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+  return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false
@@ -151,7 +154,7 @@ async function getNextOrder() {
   return Number(data?.[0]?.sort_order || 0) + 1;
 }
 
-async function uploadImageToSupabase(file, category = 'outros') {
+async function uploadImageToSupabase(file) {
   const supabase = getSupabase();
   const extByMime = {
     'image/jpeg': 'jpg',
@@ -160,9 +163,12 @@ async function uploadImageToSupabase(file, category = 'outros') {
     'image/gif': 'gif'
   };
 
-  const ext = extByMime[file.mimetype] || path.extname(file.originalname || '').replace('.', '') || 'jpg';
-  const fileName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${ext}`;
-  const storagePath = `${slugify(category)}/${fileName}`;
+  const ext = extByMime[file.mimetype] || 'jpg';
+
+  // IMPORTANTE:
+  // Caminho simples, sem espaço, sem acento, sem barra e sem usar o nome original do arquivo.
+  // Isso evita o erro do Supabase: "Invalid path specified in request URL".
+  const storagePath = `noxframe-${Date.now()}-${crypto.randomBytes(12).toString('hex')}.${ext}`;
 
   const { error } = await supabase.storage
     .from(SUPABASE_BUCKET)
@@ -283,7 +289,7 @@ async function buildProjectFromBody(body, file, oldRow = null) {
   let storagePath = oldRow?.storage_path || '';
 
   if (file) {
-    const uploaded = await uploadImageToSupabase(file, category);
+    const uploaded = await uploadImageToSupabase(file);
     imageUrl = uploaded.imageUrl;
     storagePath = uploaded.storagePath;
   }
