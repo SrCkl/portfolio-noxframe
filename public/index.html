@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Portfólio da NoxFrame Designs — artes, banners, flyers, thumbnails, cartazes e projetos visuais." />
+  <title>NoxFrame Designs | Meu Portfólio :D </title>
+  <link rel="icon" href="/assets/logo-noxframe.jpg" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="page-light page-light-a" aria-hidden="true"></div>
+  <div class="page-light page-light-b" aria-hidden="true"></div>
+
+  <header class="header" id="topo">
+    <a href="#topo" class="brand" aria-label="NoxFrame Designs">
+      <img src="/assets/logo-noxframe.jpg" alt="Logo NoxFrame Designs" />
+      <span>NoxFrame <b>Designs</b></span>
+    </a>
+
+    <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="nav" aria-label="Menu principal">
+      <a href="#portfolio">Portfólio</a>
+      <a href="#servicos">Serviços</a>
+      <a href="#sobre">Sobre</a>
+      <a href="#contato" class="nav-highlight">Contato</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero section">
+      <div class="hero-content reveal">
+        <p class="small-title">Meu Portfólio</p>
+        <h1>Isso é onde o esporte vira arte.</h1>
+        <p class="hero-text">
+          Aqui você irá ver meus Designs: thumb, cartaz, flyer,
+          folder, banner, post, homenagems, identidade visual e tudo que já fiz!.
+        </p>
+
+        <div class="hero-actions">
+          <a href="#portfolio" class="btn btn-primary">Ver trabalhos</a>
+          <a href="#contato" class="btn btn-secondary">Pedir uma arte</a>
+        </div>
+      </div>
+
+      <div class="hero-showcase reveal" aria-label="Prévia do portfólio">
+        <div class="showcase-card main-card">
+          <img src="/uploads/banner-noxframe.webp" alt="Banner NoxFrame Designs" />
+        </div>
+        <div class="showcase-card small-card card-one">
+          <img src="/uploads/yashin-aranha-negra.webp" alt="Arte Yashin Aranha Negra" />
+        </div>
+        <div class="showcase-card small-card card-two">
+          <img src="/uploads/neymar-rumo-hexa.webp" alt="Arte Neymar Rumo ao Hexa" />
+        </div>
+      </div>
+    </section>
+
+    <section class="section quick-line reveal" aria-label="Resumo">
+      <p><strong>NoxFrame Designs</strong> Aqui vou lhe mostrar os designs que já criei. Cada projeto tem sua própria identidade, mas todos carregam um pouco do meu estilo.</p>
+    </section>
+
+    <section class="section section-pad" id="portfolio">
+      <div class="section-head reveal">
+        <p class="small-title">Meus designs</p>
+        <h2>Aqui está meu Portfólio</h2>
+        <span>Filtre pela sua categoria ou veja tudo junto.</span>
+      </div>
+
+      <div class="filters reveal" id="filters" role="list" aria-label="Filtros do portfólio"></div>
+
+      <div class="portfolio-grid reveal" id="portfolioGrid" aria-live="polite"></div>
+      <p class="empty-message" id="emptyMessage" hidden>Nenhuma arte cadastrada ainda.</p>
+    </section>
+
+    <section class="section section-pad services" id="servicos">
+      <div class="section-head reveal">
+        <p class="small-title">O que dá para me pedir</p>
+        <h2>Serviços</h2>
+        <span></span>
+      </div>
+
+      <div class="services-grid reveal">
+        <article>
+          <span>01</span>
+          <h3>Thumbnails e capas</h3>
+          <p>Para YouTube, TikTok, edits, gameplay, música e conteúdo geral.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h3>Cartazes, flyers e folders</h3>
+          <p>Divulgação de evento, campeonato, promoção, lançamento ou comunicado.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h3>Posts e banners</h3>
+          <p>Artes para seu feed, perfil, canal, marca, criador.</p>
+        </article>
+        <article>
+          <span>04</span>
+          <h3>Identidade visual</h3>
+          <p>Logo, banner, entre mais!.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section section-pad about" id="sobre">
+      <div class="about-panel reveal">
+        <div>
+          <p class="small-title">Sobre</p>
+          <h2>NoxFrame Designs</h2>
+        </div>
+        <p>
+          A NoxFrame Designs nasceu para transformar ideias em artes. O foco é criar artes/designs que tenham seu estilo, composição forte e onde que a sua arte não passara reta.
+        </p>
+        <p>
+          Minhas Artes/Designs podem ser esporte, e-sports, música, anime, homenagem, thumb, flyer, folder, cartaz ou uma arte totalmente fora da caixa.
+        </p>
+      </div>
+    </section>
+
+    <section class="section section-pad contact" id="contato">
+      <div class="contact-card reveal">
+        <p class="small-title">Contato</p>
+        <h2>Quer ver mais ou pedir uma arte?</h2>
+        <p>
+          Me chama no WhatsApp, Instagram ou Tiktok. Me acompanha a NoxFrame Designs nas redes.
+        </p>
+        <div class="contact-actions">
+          <a class="btn btn-primary" id="whatsappLink" href="#" target="_blank" rel="noopener">WhatsApp</a>
+          <a class="btn btn-secondary" id="instagramLink" href="#" target="_blank" rel="noopener">Instagram</a>
+          <a class="btn btn-ghost" id="tiktokLink" href="#" target="_blank" rel="noopener">TikTok</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer section">
+    <p>© <span id="currentYear"></span> NoxFrame Designs — onde o esporte vira arte.</p>
+    <div class="footer-links">
+      <a href="#topo">Voltar ao topo</a>
+      <a class="admin-link" href="/adm" aria-label="Área administrativa">ADM</a>
+    </div>
+  </footer>
+
+  <div class="lightbox" id="lightbox" aria-hidden="true" role="dialog" aria-label="Visualização do projeto">
+    <button class="lightbox-close" type="button" aria-label="Fechar visualização">×</button>
+    <div class="lightbox-content">
+      <img id="lightboxImage" src="" alt="" />
+      <div class="lightbox-info">
+        <span id="lightboxCategory"></span>
+        <h3 id="lightboxTitle"></h3>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

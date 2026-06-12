@@ -1,0 +1,16 @@
+PUBLICAR ONLINE — AVISO RÁPIDO
+
+O site público sozinho poderia ser estático, mas o painel ADM precisa de backend.
+Isso porque:
+- a senha não pode ficar no JavaScript;
+- upload de imagem precisa ser salvo em algum lugar;
+- edição/remoção precisa alterar uma base de dados ou arquivo no servidor.
+
+Nesta versão, os dados ficam em:
+- data/projects.json
+
+E as imagens enviadas ficam em:
+- public/uploads
+
+Para produção, use um lugar que mantenha esses arquivos salvos.
+Se for Vercel, será preciso adaptar para Supabase/Cloudinary/Firebase, porque uploads locais não persistem.

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>ADM | NoxFrame Designs</title>
+  <link rel="icon" href="/assets/logo-noxframe.jpg" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body class="admin-body">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="page-light page-light-a" aria-hidden="true"></div>
+  <div class="page-light page-light-b" aria-hidden="true"></div>
+
+  <header class="admin-header section">
+    <a class="brand" href="/" aria-label="Voltar para o site">
+      <img src="/assets/logo-noxframe.jpg" alt="Logo NoxFrame Designs" />
+      <span>NoxFrame <b>ADM</b></span>
+    </a>
+
+    <div class="admin-header-actions">
+      <a class="btn btn-ghost admin-small-btn" href="/">Ver site</a>
+      <button class="btn btn-secondary admin-small-btn" id="logoutBtn" type="button" hidden>Sair</button>
+    </div>
+  </header>
+
+  <main class="admin-shell section">
+    <section class="admin-login" id="loginView" hidden>
+      <div class="admin-panel login-panel">
+        <p class="small-title">Acesso restrito</p>
+        <h1>Painel ADM</h1>
+        <p class="admin-muted">
+          Entre com a senha do servidor para gerenciar as artes do portfólio.
+        </p>
+
+        <form id="loginForm" class="admin-form">
+          <label>
+            Senha
+            <input type="password" name="password" autocomplete="current-password" placeholder="Digite sua senha" required />
+          </label>
+          <button class="btn btn-primary" type="submit">Entrar</button>
+        </form>
+
+        <p class="admin-message" id="loginMessage" role="status"></p>
+      </div>
+    </section>
+
+    <section class="admin-dashboard" id="dashboardView" hidden>
+      <div class="admin-title-row">
+        <div>
+          <p class="small-title">Gerenciamento</p>
+          <h1>Portfólio</h1>
+          <p class="admin-muted">
+            Adicione, edite, remova ou reorganize as artes que aparecem no site.
+          </p>
+        </div>
+      </div>
+
+      <div class="admin-layout">
+        <section class="admin-panel admin-editor">
+          <div class="admin-panel-head">
+            <div>
+              <p class="mini-label">Cadastro</p>
+              <h2 id="formTitle">Nova arte</h2>
+            </div>
+            <button class="ghost-link" id="cancelEditBtn" type="button" hidden>Cancelar edição</button>
+          </div>
+
+          <form id="projectForm" class="admin-form" enctype="multipart/form-data">
+            <input type="hidden" id="editingId" />
+
+            <label>
+              Título da arte
+              <input type="text" name="title" id="titleInput" maxlength="100" placeholder="Ex: Show do Brasil 6x2" required />
+            </label>
+
+            <div class="form-grid-2">
+              <label>
+                Tipo do conteúdo
+                <select name="type" id="typeSelect" required>
+                  <option value="thumbnail-video" data-label="Thumbnail de vídeo">Thumbnail de vídeo</option>
+                  <option value="capa-post" data-label="Capa / Post">Capa / Post</option>
+                  <option value="cartaz" data-label="Cartaz">Cartaz</option>
+                  <option value="folder" data-label="Folder">Folder</option>
+                  <option value="flyer" data-label="Flyer">Flyer</option>
+                  <option value="banner" data-label="Banner">Banner</option>
+                  <option value="poster" data-label="Pôster">Pôster</option>
+                  <option value="identidade-visual" data-label="Identidade visual">Identidade visual</option>
+                  <option value="homenagem" data-label="Homenagem">Homenagem</option>
+                  <option value="arte" data-label="Arte">Outro</option>
+                </select>
+              </label>
+
+              <label>
+                Categoria no site
+                <select name="category" id="categorySelect" required>
+                  <option value="thumb" data-label="Thumbs">Thumbs</option>
+                  <option value="futebol" data-label="Futebol">Futebol</option>
+                  <option value="banner" data-label="Banners">Banners</option>
+                  <option value="homenagem" data-label="Homenagem">Homenagem</option>
+                  <option value="identidade" data-label="Identidade">Identidade</option>
+                  <option value="esports" data-label="E-sports">E-sports</option>
+                  <option value="anime-musica" data-label="Anime / Música">Anime / Música</option>
+                  <option value="comercial" data-label="Comercial">Comercial</option>
+                  <option value="outros" data-label="Outros">Outros</option>
+                </select>
+              </label>
+            </div>
+
+            <label>
+              Formato visual
+              <select name="size" id="sizeSelect" required>
+                <option value="square">Quadrado / normal</option>
+                <option value="wide">Horizontal / thumbnail</option>
+                <option value="tall">Vertical / post</option>
+              </select>
+            </label>
+
+            <label>
+              Imagem
+              <input type="file" name="image" id="imageInput" accept="image/png,image/jpeg,image/webp,image/gif" required />
+              <span class="field-help" id="imageHelp">JPG, PNG, WEBP ou GIF. Até 20 MB.</span>
+            </label>
+
+            <button class="btn btn-primary" id="submitProjectBtn" type="submit">Publicar arte</button>
+          </form>
+
+          <p class="admin-message" id="formMessage" role="status"></p>
+        </section>
+
+        <section class="admin-panel admin-list-panel">
+          <div class="admin-panel-head">
+            <div>
+              <p class="mini-label">Publicado</p>
+              <h2>Artes cadastradas</h2>
+            </div>
+            <span class="counter" id="itemsCounter">0 itens</span>
+          </div>
+
+          <div class="admin-list" id="adminList"></div>
+          <p class="admin-muted" id="emptyAdminList" hidden>Nenhuma arte cadastrada ainda.</p>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>
